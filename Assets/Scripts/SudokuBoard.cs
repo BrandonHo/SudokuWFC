@@ -31,38 +31,14 @@ public class SudokuBoard
         return SudokuBoardMatrix[rowCubeIndex, colCubeIndex];
     }
 
-    /// <summary>
-    /// This helper method is used to checked whether the board is complete and no longer needs
-    /// to be processed.
-    /// </summary>
-    /// <returns>True if board complete. False if board not complete.</returns>
-    public bool IsBoardComplete()
-    {
-        int counter = 0;
-
-        for (int i = 0; i < SudokuBoardMatrix.GetLength(0); i++)
-            for (int j = 0; j < SudokuBoardMatrix.GetLength(1); j++)
-                if (SudokuBoardMatrix[i, j].Number != 0)
-                    counter++;
-
-        return counter == (NumberOfAreasInBoard.x * NumberOfCubesPerArea.x * NumberOfAreasInBoard.y * NumberOfCubesPerArea.y);
-    }
-
     public SudokuCubeData[,] CopySudokuBoardValueMatrix()
     {
         SudokuCubeData[,] matrixCopy = new SudokuCubeData[SudokuBoardMatrix.GetLength(0), SudokuBoardMatrix.GetLength(1)];
 
         for (int i = 0; i < SudokuBoardMatrix.GetLength(0); i++)
             for (int j = 0; j < SudokuBoardMatrix.GetLength(1); j++)
-                matrixCopy[i, j] = SudokuBoardMatrix[i, j];
+                matrixCopy[i, j] = SudokuBoardMatrix[i, j].CopyData();
 
         return matrixCopy;
-    }
-
-    public void ResetSudokuBoardValuesUsingMatrix(SudokuCubeData[,] resetValueMatrix)
-    {
-        for (int i = 0; i < SudokuBoardMatrix.GetLength(0); i++)
-            for (int j = 0; j < SudokuBoardMatrix.GetLength(1); j++)
-                SudokuBoardMatrix[i, j] = resetValueMatrix[i, j];
     }
 }
