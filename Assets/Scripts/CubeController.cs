@@ -11,14 +11,17 @@ public class CubeController : MonoBehaviour
     public Vector2Int CubeIndices;
 
     public UnityEventCubeUpdate OnCubeUpdateEvent;
-    public UnityEventAvailableNumbersUpdate OnAvailableNumbersUpdateEvent;
+
+    public UnityEventAvailableNumbersUpdate OnAvailableNumbersUpdateSelect,
+        OnAvailableNumbersUpdateDeselect,
+        OnAvailableNumbersUpdatePropagate;
 
     public NumberController NumberController1, NumberController2, NumberController3,
         NumberController4, NumberController5, NumberController6,
         NumberController7, NumberController8, NumberController9;
     private Dictionary<int, NumberController> NumberToNumberControllerMap;
 
-    public class UnityEventAvailableNumbersUpdate : UnityEvent<bool, Vector2Int, bool>
+    public class UnityEventAvailableNumbersUpdate : UnityEvent<Vector2Int, int, int>
     {
 
     }
@@ -27,7 +30,10 @@ public class CubeController : MonoBehaviour
     {
         // Initialise event for notifying when cube updates occur (board controller)
         OnCubeUpdateEvent = new UnityEventCubeUpdate();
-        OnAvailableNumbersUpdateEvent = new UnityEventAvailableNumbersUpdate();
+
+        OnAvailableNumbersUpdateSelect = new UnityEventAvailableNumbersUpdate();
+        OnAvailableNumbersUpdateDeselect = new UnityEventAvailableNumbersUpdate();
+        OnAvailableNumbersUpdatePropagate = new UnityEventAvailableNumbersUpdate();
     }
 
     void Start()
@@ -72,43 +78,61 @@ public class CubeController : MonoBehaviour
             OnCubeUpdateEvent.Invoke(number, CubeIndices);
     }
 
+    public void ResetCubeController()
+    {
+        CubeNumber = 0;
+        if (MainCubeText)
+        {
+            MainCubeText.text = CubeNumber + "";
+            MainCubeText.enabled = false;
+        }
+
+        ResetNumberControllerStates();
+    }
+
+    private void ResetNumberControllerStates()
+    {
+        for (int x = 0; x < AvailableNumbersForCube.Length; x++)
+            NumberToNumberControllerMap[x + 1].ToggleNumberControllerState(AvailableNumbersForCube[x]);
+    }
+
     private void ToggleStateForNumberControllers(bool enableNumberControllers)
     {
         foreach (KeyValuePair<int, NumberController> keyValuePair in NumberToNumberControllerMap)
             keyValuePair.Value.ToggleNumberControllerState(enableNumberControllers);
     }
 
-    public void RemoveNumberFromAvailableNumbersArray(int number, bool numberState, bool numberSelected)
-    {
-        bool newChange = AvailableNumbersForCube[number - 1] != numberState;
-        AvailableNumbersForCube[number - 1] = numberState;
-
-        if (newChange)
-            OnAvailableNumbersUpdateEvent.Invoke(numberState, CubeIndices, numberSelected);
-    }
-
-    public void ToggleNumberState(int number, bool disableNumber)
+    public void ToggleSpecificNumberControllerState(int number, bool newState)
     {
         if (NumberToNumberControllerMap.ContainsKey(number))
         {
             // Disable the appropriate number controller
-            NumberToNumberControllerMap[number].ToggleNumberControllerState(disableNumber);
+            NumberToNumberControllerMap[number].ToggleNumberControllerState(newState);
         }
     }
 
-    public void RefreshCubeController()
+    public void UpdateAvailableNumbers(int number, bool numberState, bool selectCube, bool deselectCube)
     {
-        if (CubeNumber != 0)
-        {
-            MainCubeText.text = CubeNumber + "";
-            MainCubeText.enabled = true;
-        }
-        else
-        {
-            MainCubeText.enabled = false;
+        // Update available numbers map/array
+        int prevCount = CountAvailableNumbersForCube();
+        AvailableNumbersForCube[number - 1] = numberState;
+        int newCount = CountAvailableNumbersForCube();
 
-            for (int i = 0; i < 9; i++)
-                NumberToNumberControllerMap[i + 1].ToggleNumberControllerState(AvailableNumbersForCube[i]);
+        // Only notify board if the available numbers changed
+        if (prevCount != newCount)
+        {
+            // If the cube is newly selected
+            if (selectCube)
+                OnAvailableNumbersUpdateSelect.Invoke(CubeIndices, prevCount, newCount);
+
+            // If the cube was previously selected
+            else if (deselectCube)
+                OnAvailableNumbersUpdateDeselect.Invoke(CubeIndices, prevCount, newCount);
+
+            // Remaining cases - where you simply adjust count map from propagation
+            // NB - should only adjust count map if the number is not yet set/selected
+            else if (CubeNumber == 0)
+                OnAvailableNumbersUpdatePropagate.Invoke(CubeIndices, prevCount, newCount);
         }
     }
 
@@ -134,9 +158,14 @@ public class CubeController : MonoBehaviour
             OnCubeUpdateEvent.AddListener(onCubeUpdateCallback);
     }
 
-    public void AddOnAvailableNumbersUpdateEventListener(UnityAction<bool, Vector2Int, bool> onAvailableNumbersUpdateCallback)
+    public void AddOnAvailableNumbersUpdateEventListener(UnityAction<Vector2Int, int, int> onAvailableNumbersUpdateCallback,
+        bool select, bool deselect)
     {
-        if (OnAvailableNumbersUpdateEvent != null)
-            OnAvailableNumbersUpdateEvent.AddListener(onAvailableNumbersUpdateCallback);
+        if ((select) && (OnAvailableNumbersUpdateSelect != null))
+            OnAvailableNumbersUpdateSelect.AddListener(onAvailableNumbersUpdateCallback);
+        else if ((deselect) && (OnAvailableNumbersUpdateDeselect != null))
+            OnAvailableNumbersUpdateDeselect.AddListener(onAvailableNumbersUpdateCallback);
+        else if (OnAvailableNumbersUpdatePropagate != null)
+            OnAvailableNumbersUpdatePropagate.AddListener(onAvailableNumbersUpdateCallback);
     }
 }

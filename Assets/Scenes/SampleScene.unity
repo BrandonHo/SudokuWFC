@@ -496,7 +496,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   SudokuBoardController: {fileID: 1065160366}
   RandomSeed: 10
-  UpdateDelayInSeconds: 1
+  UpdateDelayInSeconds: 0.5
   NumberOfAreasInBoard: {x: 3, y: 3}
   NumberOfCubesPerArea: {x: 3, y: 3}
   OffsetBetweenAreas: 0.1

@@ -12,6 +12,13 @@ public class SudokuCubeData
         CubeIndices = new Vector2Int(rowIndex, colIndex);
     }
 
+    public SudokuCubeData(Vector2Int cubeIndices, int number, bool[] availableNumbers)
+    {
+        CubeIndices = cubeIndices;
+        Number = number;
+        AvailableNumbers = availableNumbers;
+    }
+
     public int GetRandomAvailableNumber()
     {
         List<int> tempList = new List<int>();
