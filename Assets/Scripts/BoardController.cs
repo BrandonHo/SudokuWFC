@@ -121,10 +121,18 @@ public class BoardController : MonoBehaviour
         CubeControllerMatrix[lastBoardUpdate.CubeIndices.x, lastBoardUpdate.CubeIndices.y].ResetCubeController();
         RevertSelectedCubeChangeInCountMap(lastBoardUpdate.CubeIndices.x, lastBoardUpdate.CubeIndices.y);
 
+
+        /*
+            BUG:
+            - Reenabling numbers messing up the count map.
+            - See end of random seed 80 board.
+            - I suspect that this has something to do with reenabling cubes after finding out information from backtracking
+        */
+
         // Propagate the new cube number selection to surrounding cubes (area, row, column)
-        ToggleNumbersInArea(lastBoardUpdate.CubeIndices, startAreaIndices, lastBoardUpdate.CubeNumber, true);
-        ToggleNumbersinRowsOfColumn(lastBoardUpdate.CubeIndices, startAreaIndices, lastBoardUpdate.CubeNumber, true);
-        ToggleNumbersInColumnsOfRow(lastBoardUpdate.CubeIndices, startAreaIndices, lastBoardUpdate.CubeNumber, true);
+        EnableNumberInAreaOfCube(lastBoardUpdate.CubeIndices, startAreaIndices, lastBoardUpdate.CubeNumber);
+        EnableNumberInColumnOfCube(lastBoardUpdate.CubeIndices, startAreaIndices, lastBoardUpdate.CubeNumber);
+        EnableNumberInRowOfCube(lastBoardUpdate.CubeIndices, startAreaIndices, lastBoardUpdate.CubeNumber);
     }
 
     private void ToggleNumbersInArea(Vector2Int cubeIndices, Vector2Int startAreaIndices, int number, bool numberState)
@@ -196,6 +204,133 @@ public class BoardController : MonoBehaviour
                 }
             }
         }
+    }
+
+    private void EnableNumberInAreaOfCube(Vector2Int cubeIndices, Vector2Int startAreaIndices, int number)
+    {
+        for (int x = startAreaIndices.x; x < startAreaIndices.x + NumberOfCubesPerArea.x; x++)
+        {
+            for (int y = startAreaIndices.y; y < startAreaIndices.y + NumberOfCubesPerArea.y; y++)
+            {
+                // Ignore the "target" cube itself
+                if ((x != cubeIndices.x) || (y != cubeIndices.y))
+                {
+                    if (CubeControllerMatrix[x, y].CubeNumber == 0)
+                    {
+                        if ((!DoesNumberExistInColumnOfCube(x, y, startAreaIndices, number)) && (!DoesNumberExistInRowOfCube(x, y, startAreaIndices, number)))
+                        {
+                            CubeControllerMatrix[x, y].ToggleSpecificNumberControllerState(number, true);
+                        }
+                    }
+                    CubeControllerMatrix[x, y].UpdateAvailableNumbers(number, true, false, false);
+                }
+            }
+        }
+    }
+
+    private void EnableNumberInRowOfCube(Vector2Int cubeIndices, Vector2Int startAreaIndices, int number)
+    {
+        // Disable number in cubes in all rows of indicated column
+        for (int i = 0; i < CubeControllerMatrix.GetLength(0); i++)
+        {
+            // Don't update the selected cube itself - since the number has been disabled in the cube already
+            if (cubeIndices.x != i)
+            {
+                // Only disable number in cubes outside of the area (which have been processed already)
+                if ((i < startAreaIndices.x) || (i >= startAreaIndices.x + NumberOfCubesPerArea.x))
+                {
+                    if (CubeControllerMatrix[i, cubeIndices.y].CubeNumber == 0)
+                    {
+                        if ((!DoesNumberExistInAreaOfCube(cubeIndices, startAreaIndices, number)) &&
+                            (!DoesNumberExistInColumnOfCube(cubeIndices.x, cubeIndices.y, startAreaIndices, number)))
+                        {
+                            CubeControllerMatrix[i, cubeIndices.y].ToggleSpecificNumberControllerState(number, true);
+                        }
+                    }
+                    CubeControllerMatrix[i, cubeIndices.y].UpdateAvailableNumbers(number, true, false, false);
+                }
+            }
+        }
+    }
+
+    private void EnableNumberInColumnOfCube(Vector2Int cubeIndices, Vector2Int startAreaIndices, int number)
+    {
+        for (int j = 0; j < CubeControllerMatrix.GetLength(0); j++)
+        {
+            // Ignore the "target" cube itself
+            if (cubeIndices.y != j)
+            {
+                // Only consider cubes outside the area
+                if ((j < startAreaIndices.y) || (j >= startAreaIndices.y + NumberOfCubesPerArea.y))
+                {
+                    if (CubeControllerMatrix[cubeIndices.x, j].CubeNumber == 0)
+                    {
+                        if ((!DoesNumberExistInAreaOfCube(cubeIndices, startAreaIndices, number)) &&
+                        (!DoesNumberExistInRowOfCube(cubeIndices.x, cubeIndices.y, startAreaIndices, number)))
+                        {
+                            CubeControllerMatrix[cubeIndices.x, j].ToggleSpecificNumberControllerState(number, true);
+                        }
+                    }
+                    CubeControllerMatrix[cubeIndices.x, j].UpdateAvailableNumbers(number, true, false, false);
+                }
+            }
+        }
+    }
+
+    private bool DoesNumberExistInAreaOfCube(Vector2Int cubeIndices, Vector2Int startAreaIndices, int number)
+    {
+        for (int x = startAreaIndices.x; x < startAreaIndices.x + NumberOfCubesPerArea.x; x++)
+        {
+            for (int y = startAreaIndices.y; y < startAreaIndices.y + NumberOfCubesPerArea.y; y++)
+            {
+                // Ignore the "target" cube itself
+                if ((x != cubeIndices.x) || (y != cubeIndices.y))
+                {
+                    if (CubeControllerMatrix[x, y].CubeNumber == number)
+                        return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private bool DoesNumberExistInColumnOfCube(int rowIndex, int colIndex, Vector2Int startAreaIndices, int number)
+    {
+        for (int i = 0; i < CubeControllerMatrix.GetLength(0); i++)
+        {
+            // Ignore the "target" cube itself
+            if (rowIndex != i)
+            {
+                // Only consider cubes outside the area
+                if ((i < startAreaIndices.x) || (i >= startAreaIndices.x + NumberOfCubesPerArea.x))
+                {
+                    if (CubeControllerMatrix[i, colIndex].CubeNumber == number)
+                        return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private bool DoesNumberExistInRowOfCube(int rowIndex, int colIndex, Vector2Int startAreaIndices, int number)
+    {
+        for (int j = 0; j < CubeControllerMatrix.GetLength(1); j++)
+        {
+            // Ignore the "target" cube itself
+            if (colIndex != j)
+            {
+                // Only consider cubes outside the area
+                if ((j < startAreaIndices.y) || (j >= startAreaIndices.y + NumberOfCubesPerArea.y))
+                {
+                    if (CubeControllerMatrix[rowIndex, j].CubeNumber == number)
+                        return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     public void UpdateAvailableNumberCountMapSelect(Vector2Int cubeIndices, int prevCount, int newCount)

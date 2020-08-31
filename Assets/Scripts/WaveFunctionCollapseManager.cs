@@ -7,7 +7,7 @@ public class WaveFunctionCollapseManager : MonoBehaviour
     public BoardController SudokuBoardController;
     public SudokuBoard SudokuBoardData;
 
-    public Stack<BacktrackStateData> BacktrackNumberUpdates;
+    public Stack<BacktrackStateData> BacktrackStack;
 
     public int RandomSeed;
     public float UpdateDelayInSeconds;
@@ -24,7 +24,7 @@ public class WaveFunctionCollapseManager : MonoBehaviour
     {
         Random.InitState(RandomSeed);
 
-        BacktrackNumberUpdates = new Stack<BacktrackStateData>();
+        BacktrackStack = new Stack<BacktrackStateData>();
 
         SudokuBoardData = new SudokuBoard(NumberOfAreasInBoard, NumberOfCubesPerArea);
         SudokuBoardController.InstantiateBoard(NumberOfAreasInBoard, NumberOfCubesPerArea, OffsetBetweenAreas, SudokuBoardData);
@@ -63,6 +63,9 @@ public class WaveFunctionCollapseManager : MonoBehaviour
             // Select next cube with lowest entropy
             Vector2Int selectedCubeIndices = SudokuBoardController.SelectLowestEntropyCube();
             int nextAvailableNumber = SudokuBoardData.GetSudokuCubeData(selectedCubeIndices).GetRandomAvailableNumber();
+
+
+
             SudokuBoardController.SelectNumberForCube(nextAvailableNumber, selectedCubeIndices);
         }
         else
