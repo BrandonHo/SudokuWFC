@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-public class BacktrackStateData
+public struct BacktrackCubeData
 {
     public int CubeNumber;
     public Vector2Int CubeIndices;

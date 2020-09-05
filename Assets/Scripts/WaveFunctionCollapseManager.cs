@@ -7,8 +7,7 @@ public class WaveFunctionCollapseManager : MonoBehaviour
     public BoardController SudokuBoardController;
     public SudokuBoard SudokuBoardData;
 
-    public Stack<BacktrackStateData> BacktrackStack;
-
+    public Stack<BacktrackBoardUpdateData> BacktrackStack;
     public int RandomSeed;
     public float UpdateDelayInSeconds;
 
@@ -24,7 +23,7 @@ public class WaveFunctionCollapseManager : MonoBehaviour
     {
         Random.InitState(RandomSeed);
 
-        BacktrackStack = new Stack<BacktrackStateData>();
+        BacktrackStack = new Stack<BacktrackBoardUpdateData>();
 
         SudokuBoardData = new SudokuBoard(NumberOfAreasInBoard, NumberOfCubesPerArea);
         SudokuBoardController.InstantiateBoard(NumberOfAreasInBoard, NumberOfCubesPerArea, OffsetBetweenAreas, SudokuBoardData);
@@ -56,7 +55,7 @@ public class WaveFunctionCollapseManager : MonoBehaviour
         }
     }
 
-    private void ProcessGuess()
+    public void ProcessGuess()
     {
         if (SudokuBoardController.IsBoardValid())
         {
@@ -64,13 +63,32 @@ public class WaveFunctionCollapseManager : MonoBehaviour
             Vector2Int selectedCubeIndices = SudokuBoardController.SelectLowestEntropyCube();
             int nextAvailableNumber = SudokuBoardData.GetSudokuCubeData(selectedCubeIndices).GetRandomAvailableNumber();
 
-
+            BacktrackStack.Push(new BacktrackBoardUpdateData(nextAvailableNumber, selectedCubeIndices));
 
             SudokuBoardController.SelectNumberForCube(nextAvailableNumber, selectedCubeIndices);
         }
         else
         {
-            SudokuBoardController.RevertLastBoardUpdate();
+            /*
+                BUG:
+                - Multiple backtracking can lead to an endless loop
+                - Pretty convinced that it is due to loss of backtracking information and re-enablement
+            */
+
+            // Get last board update and revert changes
+            if (BacktrackStack.Count != 0)
+            {
+                BacktrackBoardUpdateData lastBoardUpdate = BacktrackStack.Pop();
+                SudokuBoardController.RevertCubeUpdate(lastBoardUpdate.SelectedCubeData.CubeIndices,
+                    lastBoardUpdate.SelectedCubeData.CubeNumber, lastBoardUpdate.InvalidCubeData);
+
+                // If there are more backtracking info in stack, notify previous stack about the invalid cube result
+                if (BacktrackStack.Count != 0)
+                {
+                    BacktrackStack.Peek().AddInvalidCubeData(lastBoardUpdate.SelectedCubeData.CubeIndices,
+                        lastBoardUpdate.SelectedCubeData.CubeNumber);
+                }
+            }
         }
     }
 
