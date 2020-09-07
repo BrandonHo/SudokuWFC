@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class WaveFunctionCollapseManager : MonoBehaviour
 {
+    public SudokuBoardDataAsset SudokuBoardDataAsset1;
     public BoardController SudokuBoardController;
     public SudokuBoard SudokuBoardData;
 
@@ -21,61 +22,61 @@ public class WaveFunctionCollapseManager : MonoBehaviour
 
     void Start()
     {
-        Random.InitState(RandomSeed);
+        // Only do initialisation if asset is assigned
+        if (SudokuBoardDataAsset1 != null)
+        {
+            Random.InitState(RandomSeed);
+            BacktrackStack = new Stack<BacktrackBoardUpdateData>();
+            SudokuBoardData = new SudokuBoard(NumberOfAreasInBoard, NumberOfCubesPerArea);
 
-        BacktrackStack = new Stack<BacktrackBoardUpdateData>();
-
-        SudokuBoardData = new SudokuBoard(NumberOfAreasInBoard, NumberOfCubesPerArea);
-        SudokuBoardController.InstantiateBoard(NumberOfAreasInBoard, NumberOfCubesPerArea, OffsetBetweenAreas, SudokuBoardData);
+            SudokuBoardController.InitialiseBoard(SudokuBoardDataAsset1, OffsetBetweenAreas);
+            SudokuBoardController.SetupAvailableCountMapsForCubes();
+        }
+        else
+            Debug.LogError("Sudoku board data asset required for board controller.");
     }
 
-    public void CubeUpdateCallback(int number, Vector2Int cubeIndices)
+    public void StartWFCSolver()
     {
-        SudokuBoardData.GetSudokuCubeData(cubeIndices).Number = number;
-    }
-
-    public void PerformWFCCallback()
-    {
-        CoroutineWFC = PerformWFC();
-        CoroutineDelay = new WaitForSeconds(UpdateDelayInSeconds);
-        StartCoroutine(CoroutineWFC);
+        if (SudokuBoardDataAsset1)
+        {
+            // Initialise and start coroutine to periodically perform WFC
+            CoroutineWFC = PerformWFC();
+            CoroutineDelay = new WaitForSeconds(UpdateDelayInSeconds);
+            StartCoroutine(CoroutineWFC);
+        }
+        else
+            Debug.LogError("Sudoku board data asset required for board controller.");
     }
 
     IEnumerator PerformWFC()
     {
         while (true)
         {
-            // Only process if board incomplete
+            // Continue to process the WFC algorithm until board is complete
             if (!SudokuBoardController.IsBoardComplete())
-            {
-                ProcessGuess();
-            }
+                PerformNextWFCStep();
 
             yield return CoroutineDelay;
         }
     }
 
-    public void ProcessGuess()
+    public void PerformNextWFCStep()
     {
         if (SudokuBoardController.IsBoardValid())
         {
             // Select next cube with lowest entropy
-            Vector2Int selectedCubeIndices = SudokuBoardController.SelectLowestEntropyCube();
-            int nextAvailableNumber = SudokuBoardData.GetSudokuCubeData(selectedCubeIndices).GetRandomAvailableNumber();
+            CubeController selectedCube = SudokuBoardController.SelectLowestEntropyCube();
+            int nextAvailableNumber = SudokuBoardDataAsset1.GetSudokuCubeData(selectedCube.CubeIndices).GetRandomAvailableNumber();
+            // SudokuBoardData.GetSudokuCubeData(selectedCube.CubeIndices).GetRandomAvailableNumber();
 
-            BacktrackStack.Push(new BacktrackBoardUpdateData(nextAvailableNumber, selectedCubeIndices));
-
-            SudokuBoardController.SelectNumberForCube(nextAvailableNumber, selectedCubeIndices);
+            // Add cube data to backtrack stack + process cube selection
+            BacktrackStack.Push(new BacktrackBoardUpdateData(nextAvailableNumber, selectedCube.CubeIndices));
+            SudokuBoardController.SelectNumberForCube(nextAvailableNumber, selectedCube.CubeIndices);
         }
         else
         {
-            /*
-                BUG:
-                - Multiple backtracking can lead to an endless loop
-                - Pretty convinced that it is due to loss of backtracking information and re-enablement
-            */
-
-            // Get last board update and revert changes
+            // Get last cube selection and revert changes
             if (BacktrackStack.Count != 0)
             {
                 BacktrackBoardUpdateData lastBoardUpdate = BacktrackStack.Pop();
@@ -92,13 +93,26 @@ public class WaveFunctionCollapseManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Method callback from manual interaction with the "Process" button in the GUI.
+    /// Used for debugging purposes.
+    /// </summary>
+    public void PerformNextWFCStepCallback()
+    {
+        // Only perform the next WFC step if the asset is actually defined
+        if (SudokuBoardDataAsset1)
+            PerformNextWFCStep();
+        else
+            Debug.LogError("Sudoku board data asset required for board controller.");
+    }
+
     void OnDrawGizmos()
     {
         if (IsDebugModeOn)
         {
             Gizmos.color = Color.red;
 
-            // Draw debug gizmo that indicates the outer board
+            // Draw debug gizmo that indicates the outer boundary of the sudoku board
             Vector3 totalWidth = new Vector3(NumberOfAreasInBoard.x * NumberOfCubesPerArea.x, 0.1f,
                 NumberOfAreasInBoard.y * NumberOfCubesPerArea.y);
             totalWidth += new Vector3((NumberOfAreasInBoard.x - 1) * OffsetBetweenAreas, 0, (NumberOfAreasInBoard.x - 1) * OffsetBetweenAreas);

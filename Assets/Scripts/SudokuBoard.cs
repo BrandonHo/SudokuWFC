@@ -29,15 +29,4 @@ public class SudokuBoard
     {
         return SudokuBoardMatrix[rowCubeIndex, colCubeIndex];
     }
-
-    public SudokuCubeData[,] CopySudokuBoardValueMatrix()
-    {
-        SudokuCubeData[,] matrixCopy = new SudokuCubeData[SudokuBoardMatrix.GetLength(0), SudokuBoardMatrix.GetLength(1)];
-
-        for (int i = 0; i < SudokuBoardMatrix.GetLength(0); i++)
-            for (int j = 0; j < SudokuBoardMatrix.GetLength(1); j++)
-                matrixCopy[i, j] = SudokuBoardMatrix[i, j].CopyData();
-
-        return matrixCopy;
-    }
 }

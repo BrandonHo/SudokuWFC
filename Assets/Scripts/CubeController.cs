@@ -36,7 +36,7 @@ public class CubeController : MonoBehaviour
         OnAvailableNumbersUpdatePropagate = new UnityEventAvailableNumbersUpdate();
     }
 
-    void Start()
+    public void Initialise()
     {
         SetupNumberControllerMap();
         if (MainCubeText)
@@ -141,6 +141,18 @@ public class CubeController : MonoBehaviour
         CubeNumber = cubeData.Number;
         AvailableNumbersForCube = cubeData.AvailableNumbers;
         CubeIndices = cubeData.CubeIndices;
+
+        if (CubeNumber != 0)
+        {
+            MainCubeText.text = CubeNumber + "";
+            MainCubeText.enabled = true;
+            ToggleStateForNumberControllers(false);
+        }
+    }
+
+    public void UpdateAvailableNumberState(int number, bool numberState)
+    {
+        AvailableNumbersForCube[number - 1] = numberState;
     }
 
     public int CountAvailableNumbersForCube()

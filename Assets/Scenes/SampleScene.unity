@@ -207,7 +207,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1065160367}
         m_TargetAssemblyTypeName: WaveFunctionCollapseManager, Assembly-CSharp
-        m_MethodName: ProcessGuess
+        m_MethodName: PerformNextWFCStepCallback
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -439,7 +439,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1065160367}
         m_TargetAssemblyTypeName: WaveFunctionCollapseManager, Assembly-CSharp
-        m_MethodName: PerformWFCCallback
+        m_MethodName: StartWFCSolver
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -627,6 +627,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ecbb77337a0b72d48881f8f124aee018, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  SudokuBoardDataAsset1: {fileID: 11400000, guid: 756fdace92c57d34499b6b58528a2e98, type: 2}
   SudokuBoardController: {fileID: 1065160366}
   RandomSeed: 80
   UpdateDelayInSeconds: 0.5

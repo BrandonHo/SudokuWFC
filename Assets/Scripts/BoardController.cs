@@ -13,36 +13,31 @@ public class BoardController : MonoBehaviour
     private Vector2Int NumberOfAreasInBoard;
     private Vector2Int NumberOfCubesPerArea;
 
-    public void InstantiateBoard(Vector2Int numberOfAreasInBoard, Vector2Int numberOfCubesPerArea, float offsetBetweenAreas, SudokuBoard boardData)
+    public void InitialiseBoard(SudokuBoardDataAsset boardDataAsset, float offsetBetweenAreas)
     {
-        NumberCountToCubeListMap = new Dictionary<int, List<CubeController>>();
-        SelectedCubeList = new List<CubeController>();
-        for (int x = 0; x < 10; x++)
-            NumberCountToCubeListMap.Add(x, new List<CubeController>());
-
-        NumberOfAreasInBoard = numberOfAreasInBoard;
-        NumberOfCubesPerArea = numberOfCubesPerArea;
+        NumberOfAreasInBoard = boardDataAsset.NumberOfAreasInBoard;
+        NumberOfCubesPerArea = boardDataAsset.NumberOfCubesPerArea;
 
         // Calculate board dimensions + initialise matrix for storing cubes of the sudoku board
-        Vector3 boardDimensions = new Vector3(numberOfAreasInBoard.x * numberOfCubesPerArea.x,
-            0, numberOfAreasInBoard.y * numberOfCubesPerArea.y);
+        Vector3 boardDimensions = new Vector3(NumberOfAreasInBoard.x * NumberOfCubesPerArea.x,
+            0, NumberOfAreasInBoard.y * NumberOfCubesPerArea.y);
         CubeControllerMatrix = new CubeController[(int)boardDimensions.x, (int)boardDimensions.z];
 
         // Initial position of cube + offset vector for correcting the position of instantiated cubes
         Vector3 cubePosition = Vector3.zero + transform.position;
-        Vector3 offsetCorrection = new Vector3(boardDimensions.x / 2 - (numberOfAreasInBoard.x - 1) * (numberOfAreasInBoard.y - 1) * offsetBetweenAreas,
-            0f, boardDimensions.z / 2 - (numberOfAreasInBoard.x - 1) * (numberOfAreasInBoard.y - 1) * offsetBetweenAreas);
+        Vector3 offsetCorrection = new Vector3(boardDimensions.x / 2 - (NumberOfAreasInBoard.x - 1) * (NumberOfAreasInBoard.y - 1) * offsetBetweenAreas,
+            0f, boardDimensions.z / 2 - (NumberOfAreasInBoard.x - 1) * (NumberOfAreasInBoard.y - 1) * offsetBetweenAreas);
 
         for (int i = 0; i < CubeControllerMatrix.GetLength(0); i++)
         {
             // Add row offset between the areas
-            if ((i != 0) && (i % numberOfCubesPerArea.x == 0))
+            if ((i != 0) && (i % NumberOfCubesPerArea.x == 0))
                 cubePosition += new Vector3(0f, 0f, offsetBetweenAreas);
 
             for (int j = 0; j < CubeControllerMatrix.GetLength(1); j++)
             {
                 // Add column offset between the areas
-                if ((j != 0) && (j % numberOfCubesPerArea.y == 0))
+                if ((j != 0) && (j % NumberOfCubesPerArea.y == 0))
                     cubePosition += new Vector3(offsetBetweenAreas, 0f, 0f);
 
                 // Instantiate cube + set parenting for the cubes
@@ -51,10 +46,11 @@ public class BoardController : MonoBehaviour
 
                 // Most importantly, reference the cube controller component in the matrix
                 CubeControllerMatrix[i, j] = newCube.GetComponent<CubeController>();
+                CubeControllerMatrix[i, j].Initialise();
 
                 // Update cube indices + add callback for cube update events
-                CubeControllerMatrix[i, j].SetCubeData(boardData.GetSudokuCubeData(i, j));
-                AddCubeToAvailableCountMap(i, j);
+                CubeControllerMatrix[i, j].SetCubeData(boardDataAsset.GetSudokuCubeData(i, j));
+
                 CubeControllerMatrix[i, j].AddOnCubeEventListener(OnCubeUpdateCallback);
                 CubeControllerMatrix[i, j].AddOnAvailableNumbersUpdateEventListener(UpdateAvailableNumberCountMapSelect, true, false);
                 CubeControllerMatrix[i, j].AddOnAvailableNumbersUpdateEventListener(UpdateAvailableNumberCountMapDeselect, false, true);
@@ -67,6 +63,47 @@ public class BoardController : MonoBehaviour
             // Reset column position + adjust row position for next row of cubes
             cubePosition = new Vector3(0f, 0f, cubePosition.z + 1f);
         }
+    }
+
+    public void SetupAvailableCountMapsForCubes()
+    {
+        NumberCountToCubeListMap = new Dictionary<int, List<CubeController>>();
+        SelectedCubeList = new List<CubeController>();
+        for (int x = 0; x < 10; x++)
+            NumberCountToCubeListMap.Add(x, new List<CubeController>());
+
+        for (int i = 0; i < CubeControllerMatrix.GetLength(0); i++)
+        {
+            for (int j = 0; j < CubeControllerMatrix.GetLength(1); j++)
+            {
+                // Identify invalid numbers for cube
+                for (int aNumber = 1; aNumber <= 9; aNumber++)
+                {
+                    if (!IsNumberValidAtCubeIndices(i, j, aNumber))
+                    {
+                        CubeControllerMatrix[i, j].UpdateAvailableNumberState(aNumber, false);
+                        CubeControllerMatrix[i, j].ToggleSpecificNumberControllerState(aNumber, false);
+                    }
+                }
+
+                // Then add the cube to appropriate count list in map
+                AddCubeToAvailableCountMap(CubeControllerMatrix[i, j]);
+            }
+        }
+    }
+
+    private bool IsNumberValidAtCubeIndices(int rowIndex, int colIndex, int number)
+    {
+        Vector2Int startAreaIndices = CalculateAreaStartIndicesFromCubeIndices(new Vector2Int(rowIndex, colIndex));
+
+        if (DoesNumberExistInAreaOfCube(rowIndex, colIndex, startAreaIndices, number))
+            return false;
+        if (DoesNumberExistInColumnOfCube(rowIndex, colIndex, startAreaIndices, number))
+            return false;
+        if (DoesNumberExistInRowOfCube(rowIndex, colIndex, startAreaIndices, number))
+            return false;
+
+        return true;
     }
 
     /// <summary>
@@ -360,10 +397,8 @@ public class BoardController : MonoBehaviour
         NumberCountToCubeListMap[newCount].Add(CubeControllerMatrix[cubeIndices.x, cubeIndices.y]);
     }
 
-    private void AddCubeToAvailableCountMap(int rowIndex, int colIndex)
+    private void AddCubeToAvailableCountMap(CubeController cubeController)
     {
-        CubeController cubeController = CubeControllerMatrix[rowIndex, colIndex];
-
         // If selected, put into selected list
         if (cubeController.CubeNumber != 0)
             SelectedCubeList.Add(cubeController);
@@ -412,7 +447,7 @@ public class BoardController : MonoBehaviour
         return counter == (NumberOfAreasInBoard.x * NumberOfCubesPerArea.x * NumberOfAreasInBoard.y * NumberOfCubesPerArea.y);
     }
 
-    public Vector2Int SelectLowestEntropyCube()
+    public CubeController SelectLowestEntropyCube()
     {
         // Ignore 0 since we looking for cubes that do not yet have a number
         for (int i = 1; i < 10; i++)
@@ -420,10 +455,10 @@ public class BoardController : MonoBehaviour
             if (NumberCountToCubeListMap[i].Count > 0)
             {
                 int randomPosition = Random.Range(0, NumberCountToCubeListMap[i].Count);
-                return NumberCountToCubeListMap[i][randomPosition].CubeIndices;
+                return NumberCountToCubeListMap[i][randomPosition];
             }
         }
 
-        return new Vector2Int(-1, -1);
+        return null;
     }
 }
