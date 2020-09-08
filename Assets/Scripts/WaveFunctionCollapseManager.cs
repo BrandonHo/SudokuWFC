@@ -2,20 +2,17 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+#pragma warning disable 0649  
 public class WaveFunctionCollapseManager : MonoBehaviour
 {
-    public SudokuBoardDataAsset SudokuBoardDataAsset1;
+    public SudokuBoardDataAsset SudokuBoardData;
     public BoardController SudokuBoardController;
-    public SudokuBoard SudokuBoardData;
+    private Stack<BacktrackBoardUpdateData> BacktrackStack;
 
-    public Stack<BacktrackBoardUpdateData> BacktrackStack;
-    public int RandomSeed;
-    public float UpdateDelayInSeconds;
-
-    public Vector2Int NumberOfAreasInBoard;
-    public Vector2Int NumberOfCubesPerArea;
-    public float OffsetBetweenAreas;
-    public bool IsDebugModeOn;
+    [SerializeField] private int RandomSeed;
+    [SerializeField] private float UpdateDelayInSeconds;
+    [SerializeField] private float OffsetBetweenAreas;
+    [SerializeField] private bool IsDebugModeOn;
 
     private IEnumerator CoroutineWFC;
     private WaitForSeconds CoroutineDelay;
@@ -23,13 +20,11 @@ public class WaveFunctionCollapseManager : MonoBehaviour
     void Start()
     {
         // Only do initialisation if asset is assigned
-        if (SudokuBoardDataAsset1 != null)
+        if (SudokuBoardData != null)
         {
             Random.InitState(RandomSeed);
             BacktrackStack = new Stack<BacktrackBoardUpdateData>();
-            SudokuBoardData = new SudokuBoard(NumberOfAreasInBoard, NumberOfCubesPerArea);
-
-            SudokuBoardController.InitialiseBoard(SudokuBoardDataAsset1, OffsetBetweenAreas);
+            SudokuBoardController.CreateSudokuBoard(SudokuBoardData, OffsetBetweenAreas);
             SudokuBoardController.SetupAvailableCountMapsForCubes();
         }
         else
@@ -38,7 +33,7 @@ public class WaveFunctionCollapseManager : MonoBehaviour
 
     public void StartWFCSolver()
     {
-        if (SudokuBoardDataAsset1)
+        if (SudokuBoardData)
         {
             // Initialise and start coroutine to periodically perform WFC
             CoroutineWFC = PerformWFC();
@@ -61,13 +56,29 @@ public class WaveFunctionCollapseManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Method callback from manual interaction with the "Process" button in the GUI.
+    /// Used for debugging purposes.
+    /// </summary>
+    public void PerformNextWFCStepCallback()
+    {
+        // Only perform the next WFC step if the asset is actually defined
+        if (SudokuBoardData)
+            PerformNextWFCStep();
+        else
+            Debug.LogError("Sudoku board data asset required for board controller.");
+    }
+
+    /// <summary>
+    /// Primary method for performing the WFC algorithm.
+    /// </summary>
     public void PerformNextWFCStep()
     {
         if (SudokuBoardController.IsBoardValid())
         {
             // Select next cube with lowest entropy
             CubeController selectedCube = SudokuBoardController.SelectLowestEntropyCube();
-            int nextAvailableNumber = SudokuBoardDataAsset1.GetSudokuCubeData(selectedCube.CubeIndices).GetRandomAvailableNumber();
+            int nextAvailableNumber = SudokuBoardData.GetSudokuCubeData(selectedCube.CubeIndices).GetRandomAvailableNumber();
             // SudokuBoardData.GetSudokuCubeData(selectedCube.CubeIndices).GetRandomAvailableNumber();
 
             // Add cube data to backtrack stack + process cube selection
@@ -93,30 +104,21 @@ public class WaveFunctionCollapseManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Method callback from manual interaction with the "Process" button in the GUI.
-    /// Used for debugging purposes.
-    /// </summary>
-    public void PerformNextWFCStepCallback()
-    {
-        // Only perform the next WFC step if the asset is actually defined
-        if (SudokuBoardDataAsset1)
-            PerformNextWFCStep();
-        else
-            Debug.LogError("Sudoku board data asset required for board controller.");
-    }
-
     void OnDrawGizmos()
     {
         if (IsDebugModeOn)
         {
-            Gizmos.color = Color.red;
+            if (SudokuBoardData)
+            {
+                Gizmos.color = Color.red;
 
-            // Draw debug gizmo that indicates the outer boundary of the sudoku board
-            Vector3 totalWidth = new Vector3(NumberOfAreasInBoard.x * NumberOfCubesPerArea.x, 0.1f,
-                NumberOfAreasInBoard.y * NumberOfCubesPerArea.y);
-            totalWidth += new Vector3((NumberOfAreasInBoard.x - 1) * OffsetBetweenAreas, 0, (NumberOfAreasInBoard.x - 1) * OffsetBetweenAreas);
-            Gizmos.DrawWireCube(transform.position, totalWidth);
+                // Draw debug gizmo that indicates the outer boundary of the sudoku board
+                Vector3 totalWidth = new Vector3(SudokuBoardData.NumberOfAreasInBoard.x * SudokuBoardData.NumberOfCubesPerArea.x, 0.1f,
+                    SudokuBoardData.NumberOfAreasInBoard.y * SudokuBoardData.NumberOfCubesPerArea.y);
+                totalWidth += new Vector3((SudokuBoardData.NumberOfAreasInBoard.x - 1) * OffsetBetweenAreas, 0,
+                    (SudokuBoardData.NumberOfAreasInBoard.x - 1) * OffsetBetweenAreas);
+                Gizmos.DrawWireCube(transform.position, totalWidth);
+            }
         }
     }
 }

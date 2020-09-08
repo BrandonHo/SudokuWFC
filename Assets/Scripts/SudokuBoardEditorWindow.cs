@@ -10,9 +10,9 @@ public class SudokuBoardEditorWindow : EditorWindow
         window.Show();
     }
 
-    public SudokuBoardDataAsset CurrentSudokuBoardDataAsset;
-    public Vector2Int NumberOfAreasInBoard, NumberOfCubesPerArea;
-    public int[,] SudokuBoardData;
+    private SudokuBoardDataAsset CurrentSudokuBoardDataAsset;
+    private Vector2Int NumberOfAreasInBoard, NumberOfCubesPerArea;
+    private int[,] SudokuBoardData;
 
     void OnGUI()
     {
@@ -36,7 +36,7 @@ public class SudokuBoardEditorWindow : EditorWindow
             {
                 NumberOfAreasInBoard = CurrentSudokuBoardDataAsset.NumberOfAreasInBoard;
                 NumberOfCubesPerArea = CurrentSudokuBoardDataAsset.NumberOfCubesPerArea;
-                SudokuBoardData = CurrentSudokuBoardDataAsset.GetSudokuBoardData();
+                SudokuBoardData = CurrentSudokuBoardDataAsset.GetSudokuBoardNumbers();
             }
         }
     }
@@ -52,7 +52,7 @@ public class SudokuBoardEditorWindow : EditorWindow
 
             if (GUILayout.Button("Create New Sudoku Board Data Matrix"))
             {
-                CurrentSudokuBoardDataAsset.Init(NumberOfAreasInBoard, NumberOfCubesPerArea);
+                CurrentSudokuBoardDataAsset.Initialise(NumberOfAreasInBoard, NumberOfCubesPerArea);
                 SudokuBoardData = new int[NumberOfAreasInBoard.x * NumberOfCubesPerArea.x, NumberOfAreasInBoard.y * NumberOfCubesPerArea.y];
             }
         }

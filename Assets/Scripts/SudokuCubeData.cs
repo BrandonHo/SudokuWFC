@@ -20,8 +20,6 @@ public class SudokuCubeData
             if (AvailableNumbers[i])
                 tempList.Add(i + 1);
 
-        int test = tempList.Count;
-
         return tempList[Random.Range(0, tempList.Count)];
     }
 
@@ -29,7 +27,6 @@ public class SudokuCubeData
     {
         SudokuCubeData newCopy = new SudokuCubeData(CubeIndices.x, CubeIndices.y);
         newCopy.Number = Number;
-
         for (int i = 0; i < AvailableNumbers.Length; i++)
             newCopy.AvailableNumbers[i] = AvailableNumbers[i];
 

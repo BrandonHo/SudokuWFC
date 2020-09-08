@@ -3,36 +3,42 @@ using UnityEngine.Events;
 using TMPro;
 using System.Collections.Generic;
 
+/// <summary>
+/// This class describes the functional logic for a cube within a sudoku board.
+/// </summary>
 public class CubeController : MonoBehaviour
 {
-    public int CubeNumber;
-    private bool[] AvailableNumbersForCube;
-    public TextMeshProUGUI MainCubeText;
-    public Vector2Int CubeIndices;
+    public int CubeNumber;                          // Number associated with the cube controller
+    private bool[] AvailableNumbersForCube;         // An array that indicates which numbers can be selected for this cube
+    public TextMeshProUGUI MainCubeText;            // The primary text that illustrates the number associated with the cube controller
+    public Vector2Int CubeIndices;                  // Indices of the cube in the sudoku board
+    private UnityEventCubeUpdate OnCubeUpdateEvent; // Event for notifying listeners when a number is selected for the cube controller
 
-    public UnityEventCubeUpdate OnCubeUpdateEvent;
-
-    public UnityEventAvailableNumbersUpdate OnAvailableNumbersUpdateSelect,
-        OnAvailableNumbersUpdateDeselect,
-        OnAvailableNumbersUpdatePropagate;
-
-    public NumberController NumberController1, NumberController2, NumberController3,
-        NumberController4, NumberController5, NumberController6,
-        NumberController7, NumberController8, NumberController9;
-    private Dictionary<int, NumberController> NumberToNumberControllerMap;
+    /*
+        These events are used to trigger specific changes to the available count map in the board controller. This count map
+        is used to quickly query cube controllers with specific counts of available numbers to be selected.
+    */
+    public UnityEventAvailableNumbersUpdate OnAvailableNumbersUpdateSelect, OnAvailableNumbersUpdatePropagate;
 
     public class UnityEventAvailableNumbersUpdate : UnityEvent<Vector2Int, int, int>
     {
-
+        // Custom event for triggering specific changes to the available count map in the board controller.
     }
+
+    /*
+        These number controllers are associated with the cube controller, and are interacted with to select a number 
+        for the cube controller.
+    */
+    public NumberController NumberController1, NumberController2, NumberController3,
+        NumberController4, NumberController5, NumberController6,
+        NumberController7, NumberController8, NumberController9;
+
+    private Dictionary<int, NumberController> NumberToNumberControllerMap;  // Map that is used to quickly access specific number controllers in the cube
 
     void Awake()
     {
-        // Initialise event for notifying when cube updates occur (board controller)
         OnCubeUpdateEvent = new UnityEventCubeUpdate();
-
         OnAvailableNumbersUpdateSelect = new UnityEventAvailableNumbersUpdate();
-        OnAvailableNumbersUpdateDeselect = new UnityEventAvailableNumbersUpdate();
         OnAvailableNumbersUpdatePropagate = new UnityEventAvailableNumbersUpdate();
     }
 
@@ -45,6 +51,7 @@ public class CubeController : MonoBehaviour
 
     private void SetupNumberControllerMap()
     {
+        // Add each of the specific number controllers to the map
         NumberToNumberControllerMap = new Dictionary<int, NumberController>();
         NumberToNumberControllerMap.Add(1, NumberController1);
         NumberToNumberControllerMap.Add(2, NumberController2);
@@ -56,10 +63,15 @@ public class CubeController : MonoBehaviour
         NumberToNumberControllerMap.Add(8, NumberController8);
         NumberToNumberControllerMap.Add(9, NumberController9);
 
+        // Attach cube controller as listener to the specified number controllers
         foreach (KeyValuePair<int, NumberController> keyValuePair in NumberToNumberControllerMap)
             keyValuePair.Value.AddNumberClickEventListener(OnNumberClickCallback);
     }
 
+    /// <summary>
+    /// Primary method for selecting a number for the cube controller.
+    /// </summary>
+    /// <param name="number">Number to be selected for the cube controller</param>
     public void OnNumberClickCallback(int number)
     {
         // Update main text to reflect the newly selected number
@@ -78,6 +90,10 @@ public class CubeController : MonoBehaviour
             OnCubeUpdateEvent.Invoke(number, CubeIndices);
     }
 
+    /// <summary>
+    /// Method used to revert the state of a selected cube controller
+    /// back to a unselected cube controller.
+    /// </summary>
     public void ResetCubeController()
     {
         CubeNumber = 0;
@@ -111,7 +127,7 @@ public class CubeController : MonoBehaviour
         }
     }
 
-    public void UpdateAvailableNumbers(int number, bool numberState, bool selectCube, bool deselectCube)
+    public void UpdateAvailableNumbers(int number, bool numberState, bool selectCube)
     {
         // Update available numbers map/array
         int prevCount = CountAvailableNumbersForCube();
@@ -124,10 +140,6 @@ public class CubeController : MonoBehaviour
             // If the cube is newly selected
             if (selectCube)
                 OnAvailableNumbersUpdateSelect.Invoke(CubeIndices, prevCount, newCount);
-
-            // If the cube was previously selected
-            else if (deselectCube)
-                OnAvailableNumbersUpdateDeselect.Invoke(CubeIndices, prevCount, newCount);
 
             // Remaining cases - where you simply adjust count map from propagation
             // NB - should only adjust count map if the number is not yet set/selected
@@ -175,8 +187,6 @@ public class CubeController : MonoBehaviour
     {
         if ((select) && (OnAvailableNumbersUpdateSelect != null))
             OnAvailableNumbersUpdateSelect.AddListener(onAvailableNumbersUpdateCallback);
-        else if ((deselect) && (OnAvailableNumbersUpdateDeselect != null))
-            OnAvailableNumbersUpdateDeselect.AddListener(onAvailableNumbersUpdateCallback);
         else if (OnAvailableNumbersUpdatePropagate != null)
             OnAvailableNumbersUpdatePropagate.AddListener(onAvailableNumbersUpdateCallback);
     }

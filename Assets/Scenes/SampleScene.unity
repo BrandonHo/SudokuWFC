@@ -627,12 +627,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ecbb77337a0b72d48881f8f124aee018, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  SudokuBoardDataAsset1: {fileID: 11400000, guid: 756fdace92c57d34499b6b58528a2e98, type: 2}
+  SudokuBoardData: {fileID: 11400000, guid: 756fdace92c57d34499b6b58528a2e98, type: 2}
   SudokuBoardController: {fileID: 1065160366}
   RandomSeed: 80
   UpdateDelayInSeconds: 0.5
-  NumberOfAreasInBoard: {x: 3, y: 3}
-  NumberOfCubesPerArea: {x: 3, y: 3}
   OffsetBetweenAreas: 0.1
   IsDebugModeOn: 1
 --- !u!1 &1694737124

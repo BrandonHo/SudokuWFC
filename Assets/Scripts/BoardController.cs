@@ -1,59 +1,58 @@
 ﻿using UnityEngine;
-using UnityEngine.Events;
 using System.Collections.Generic;
 
 public class BoardController : MonoBehaviour
 {
-    public GameObject CubePrefab;
-    private CubeController[,] CubeControllerMatrix;
+    public GameObject CubePrefab;                                           // Prefab for representing cubes in the sudoku board
+    private CubeController[,] CubeControllerMatrix;                         // Jagged array that contains references to cube controllers in the sudoku board
+    private Dictionary<int, List<CubeController>> NumberCountToCubeListMap; // Map that is used to query for cube controllers with specific counts
+    private List<CubeController> SelectedCubeList;                          // List that contains all cube controllers that have a number (selected)
+    private Vector2Int NumberOfAreasInBoard;                                // Vector that describes the number of areas in the sudoku board
+    private Vector2Int NumberOfCubesPerArea;                                // Vector that describes the number of cubes per area in the sudoku board
 
-    private Dictionary<int, List<CubeController>> NumberCountToCubeListMap;
-    private List<CubeController> SelectedCubeList;
-
-    private Vector2Int NumberOfAreasInBoard;
-    private Vector2Int NumberOfCubesPerArea;
-
-    public void InitialiseBoard(SudokuBoardDataAsset boardDataAsset, float offsetBetweenAreas)
+    /// <summary>
+    /// Method that instantiates the cube game objects for the sudoku board.
+    /// </summary>
+    /// <param name="boardDataAsset">Asset that contains sudoku board data.</param>
+    /// <param name="offsetBetweenAreas">Offset distance between areas in the sudoku board.</param>
+    public void CreateSudokuBoard(SudokuBoardDataAsset boardDataAsset, float offsetBetweenAreas)
     {
         NumberOfAreasInBoard = boardDataAsset.NumberOfAreasInBoard;
         NumberOfCubesPerArea = boardDataAsset.NumberOfCubesPerArea;
 
         // Calculate board dimensions + initialise matrix for storing cubes of the sudoku board
-        Vector3 boardDimensions = new Vector3(NumberOfAreasInBoard.x * NumberOfCubesPerArea.x,
-            0, NumberOfAreasInBoard.y * NumberOfCubesPerArea.y);
+        Vector3 boardDimensions = new Vector3(NumberOfAreasInBoard.x * NumberOfCubesPerArea.x, 0, NumberOfAreasInBoard.y * NumberOfCubesPerArea.y);
         CubeControllerMatrix = new CubeController[(int)boardDimensions.x, (int)boardDimensions.z];
 
-        // Initial position of cube + offset vector for correcting the position of instantiated cubes
+        // Calculate initial position of cube + offset vector for correcting the position of instantiated cube game objects
         Vector3 cubePosition = Vector3.zero + transform.position;
         Vector3 offsetCorrection = new Vector3(boardDimensions.x / 2 - (NumberOfAreasInBoard.x - 1) * (NumberOfAreasInBoard.y - 1) * offsetBetweenAreas,
             0f, boardDimensions.z / 2 - (NumberOfAreasInBoard.x - 1) * (NumberOfAreasInBoard.y - 1) * offsetBetweenAreas);
 
         for (int i = 0; i < CubeControllerMatrix.GetLength(0); i++)
         {
-            // Add row offset between the areas
+            // Add row offset between areas - if needed
             if ((i != 0) && (i % NumberOfCubesPerArea.x == 0))
                 cubePosition += new Vector3(0f, 0f, offsetBetweenAreas);
 
             for (int j = 0; j < CubeControllerMatrix.GetLength(1); j++)
             {
-                // Add column offset between the areas
+                // Add column offset between areas - if needed
                 if ((j != 0) && (j % NumberOfCubesPerArea.y == 0))
                     cubePosition += new Vector3(offsetBetweenAreas, 0f, 0f);
 
-                // Instantiate cube + set parenting for the cubes
+                // Instantiate + set parenting for the cube game objects
                 GameObject newCube = Instantiate(CubePrefab, cubePosition - offsetCorrection, Quaternion.identity);
                 newCube.transform.SetParent(transform);
 
-                // Most importantly, reference the cube controller component in the matrix
+                // Reference, initialise, and update cube with appropriate data
                 CubeControllerMatrix[i, j] = newCube.GetComponent<CubeController>();
                 CubeControllerMatrix[i, j].Initialise();
-
-                // Update cube indices + add callback for cube update events
                 CubeControllerMatrix[i, j].SetCubeData(boardDataAsset.GetSudokuCubeData(i, j));
 
+                // Add listeners to appropriate events 
                 CubeControllerMatrix[i, j].AddOnCubeEventListener(OnCubeUpdateCallback);
                 CubeControllerMatrix[i, j].AddOnAvailableNumbersUpdateEventListener(UpdateAvailableNumberCountMapSelect, true, false);
-                CubeControllerMatrix[i, j].AddOnAvailableNumbersUpdateEventListener(UpdateAvailableNumberCountMapDeselect, false, true);
                 CubeControllerMatrix[i, j].AddOnAvailableNumbersUpdateEventListener(UpdateAvailableNumberCountMapPropagate, false, false);
 
                 // Adjust column position for next cube
@@ -65,20 +64,27 @@ public class BoardController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Method that initialises the available count maps for tracking cube game objects.
+    /// This method should be called directly after the initialise board method.
+    /// </summary>
     public void SetupAvailableCountMapsForCubes()
     {
+        // Initialise available number count map + selected cube list
         NumberCountToCubeListMap = new Dictionary<int, List<CubeController>>();
         SelectedCubeList = new List<CubeController>();
         for (int x = 0; x < 10; x++)
             NumberCountToCubeListMap.Add(x, new List<CubeController>());
 
+        // Cubes are initially instantiated with every number available - therefore we need to check which ones are invalid
         for (int i = 0; i < CubeControllerMatrix.GetLength(0); i++)
         {
             for (int j = 0; j < CubeControllerMatrix.GetLength(1); j++)
             {
-                // Identify invalid numbers for cube
+                // Identify invalid numbers for cubes
                 for (int aNumber = 1; aNumber <= 9; aNumber++)
                 {
+                    // If number invalid -  notify cube and disable the appropriate number controller
                     if (!IsNumberValidAtCubeIndices(i, j, aNumber))
                     {
                         CubeControllerMatrix[i, j].UpdateAvailableNumberState(aNumber, false);
@@ -92,18 +98,36 @@ public class BoardController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Helper method for checking whether a number can exist at the specified indices in the sudoku board.
+    /// </summary>
+    /// <param name="rowIndex">Index for row in the sudoku board.</param>
+    /// <param name="colIndex">Index for column in the sudoku board.</param>
+    /// <param name="number">The number that is validated at the indices in the sudoku board.</param>
+    /// <returns>True if number can exist at specified cube indices, false otherwise.</returns>
     private bool IsNumberValidAtCubeIndices(int rowIndex, int colIndex, int number)
     {
         Vector2Int startAreaIndices = CalculateAreaStartIndicesFromCubeIndices(new Vector2Int(rowIndex, colIndex));
 
-        if (DoesNumberExistInAreaOfCube(rowIndex, colIndex, startAreaIndices, number))
+        if (DoesNumberExistInArea(rowIndex, colIndex, startAreaIndices, number))
             return false;
-        if (DoesNumberExistInColumnOfCube(rowIndex, colIndex, startAreaIndices, number))
+        if (DoesNumberExistInColumn(rowIndex, colIndex, startAreaIndices, number))
             return false;
-        if (DoesNumberExistInRowOfCube(rowIndex, colIndex, startAreaIndices, number))
+        if (DoesNumberExistInRow(rowIndex, colIndex, startAreaIndices, number))
             return false;
 
         return true;
+    }
+
+    /// <summary>
+    /// Helper method for calculating the starting indices of an area for specific cube indices.
+    /// </summary>
+    /// <param name="cubeIndices">Cube indices for calculating the starting area indices.</param>
+    /// <returns>The starting area indices of the specified cube indices.</returns>
+    private Vector2Int CalculateAreaStartIndicesFromCubeIndices(Vector2Int cubeIndices)
+    {
+        return new Vector2Int((cubeIndices.x / NumberOfAreasInBoard.x) * NumberOfAreasInBoard.x,
+            (cubeIndices.y / NumberOfAreasInBoard.y) * NumberOfAreasInBoard.y);
     }
 
     /// <summary>
@@ -128,86 +152,71 @@ public class BoardController : MonoBehaviour
 
         // Disable the selected cube
         CubeControllerMatrix[cubeIndices.x, cubeIndices.y].ToggleSpecificNumberControllerState(number, false);
-        CubeControllerMatrix[cubeIndices.x, cubeIndices.y].UpdateAvailableNumbers(number, false, true, false);
+        CubeControllerMatrix[cubeIndices.x, cubeIndices.y].UpdateAvailableNumbers(number, false, true);
 
         // Propagate the new cube number selection to surrounding cubes (area, row, column)
-        ToggleNumbersInArea(cubeIndices, startAreaIndices, number, false);
-        ToggleNumbersinRowsOfColumn(cubeIndices, startAreaIndices, number, false);
-        ToggleNumbersInColumnsOfRow(cubeIndices, startAreaIndices, number, false);
+        DisableNumberInArea(cubeIndices, startAreaIndices, number);
+        DisableNumberInColumn(cubeIndices, startAreaIndices, number);
+        DisableNumberInRow(cubeIndices, startAreaIndices, number);
     }
 
-    private Vector2Int CalculateAreaStartIndicesFromCubeIndices(Vector2Int cubeIndices)
+    /// <summary>
+    /// Method for disabling specific number controllers of cube game objects within a specific area of the sudoku board.
+    /// </summary>
+    /// <param name="cubeIndices">Indices of the selected cube game object in the sudoku board.</param>
+    /// <param name="startAreaIndices">Starting indices of the area associated with the selected cube game object.</param>
+    /// <param name="number">The number identifying number controllers of cube game objects to be disabled in a specified area of the sudoku board.</param>
+    private void DisableNumberInArea(Vector2Int cubeIndices, Vector2Int startAreaIndices, int number)
     {
-        return new Vector2Int((cubeIndices.x / NumberOfAreasInBoard.x) * NumberOfAreasInBoard.x,
-            (cubeIndices.y / NumberOfAreasInBoard.y) * NumberOfAreasInBoard.y);
-    }
-
-    public void RevertCubeUpdate(Vector2Int cubeIndices, int cubeNumber, Dictionary<int, List<BacktrackCubeData>> invalidCubeData)
-    {
-        // Calculuate the start area indices associated with the specified cube
-        Vector2Int startAreaIndices = CalculateAreaStartIndicesFromCubeIndices(cubeIndices);
-
-        // Re-enable/Reset the selected cube
-        CubeControllerMatrix[cubeIndices.x, cubeIndices.y].ResetCubeController();
-        RevertSelectedCubeChangeInCountMap(cubeIndices.x, cubeIndices.y);
-
-        // Propagate the new cube number selection to surrounding cubes (area, row, column)
-        EnableNumberInAreaOfCube(cubeIndices, startAreaIndices, cubeNumber, invalidCubeData);
-        EnableNumberInColumnOfCube(cubeIndices, startAreaIndices, cubeNumber, invalidCubeData);
-        EnableNumberInRowOfCube(cubeIndices, startAreaIndices, cubeNumber, invalidCubeData);
-    }
-
-    private void ToggleNumbersInArea(Vector2Int cubeIndices, Vector2Int startAreaIndices, int number, bool numberState)
-    {
-        /*
-            Disable number in area of the cube indices.
-
-            This is done by calculating the starting area indices associated with the cube indices,
-            where integer division is used to find out the correct area and then multiplied by three
-            to indicate the starting indices of the area.
-
-            Lastly, we simply iterate up to the number of cubes per area per axis, and disable each cube.
-        */
-
+        // Iterate through indices of the area associated with the cube
         for (int x = startAreaIndices.x; x < startAreaIndices.x + NumberOfCubesPerArea.x; x++)
         {
             for (int y = startAreaIndices.y; y < startAreaIndices.y + NumberOfCubesPerArea.y; y++)
             {
+                // Don't toggle state of the cube itself in the area
                 if ((x != cubeIndices.x) || (y != cubeIndices.y))
                 {
+                    // Toggle number controller state associated with number + update count map
                     if (CubeControllerMatrix[x, y].CubeNumber == 0)
-                    {
-                        CubeControllerMatrix[x, y].ToggleSpecificNumberControllerState(number, numberState);
-                    }
-                    CubeControllerMatrix[x, y].UpdateAvailableNumbers(number, numberState, false, false);
+                        CubeControllerMatrix[x, y].ToggleSpecificNumberControllerState(number, false);
+                    CubeControllerMatrix[x, y].UpdateAvailableNumbers(number, false, false);
                 }
             }
         }
     }
 
-    private void ToggleNumbersinRowsOfColumn(Vector2Int cubeIndices, Vector2Int startAreaIndices, int number, bool numberState)
+    /// <summary>
+    /// Method for disabling specific number controllers of cube game objects within a specific column of the sudoku board.
+    /// </summary>
+    /// <param name="cubeIndices">Indices of the selected cube game object in the sudoku board.</param>
+    /// <param name="startAreaIndices">Starting indices of the area associated with the selected cube game object.</param>
+    /// <param name="number">The number identifying number controllers of cube game objects to be disabled in a specified column of the sudoku board.</param>
+    private void DisableNumberInColumn(Vector2Int cubeIndices, Vector2Int startAreaIndices, int number)
     {
-        // Disable number in cubes in all rows of indicated column
         for (int i = 0; i < CubeControllerMatrix.GetLength(0); i++)
         {
-            // Don't update the selected cube itself - since the number has been disabled in the cube already
+            // Don't update the selected cube itself - since the number has been handled in the cube already
             if (cubeIndices.x != i)
             {
                 // Only disable number in cubes outside of the area (which have been processed already)
                 if ((i < startAreaIndices.x) || (i >= startAreaIndices.x + NumberOfCubesPerArea.x))
                 {
+                    // Toggle number controller state associated with number + update count map
                     if (CubeControllerMatrix[i, cubeIndices.y].CubeNumber == 0)
-                    {
-                        CubeControllerMatrix[i, cubeIndices.y].ToggleSpecificNumberControllerState(number, numberState);
-
-                    }
-                    CubeControllerMatrix[i, cubeIndices.y].UpdateAvailableNumbers(number, numberState, false, false);
+                        CubeControllerMatrix[i, cubeIndices.y].ToggleSpecificNumberControllerState(number, false);
+                    CubeControllerMatrix[i, cubeIndices.y].UpdateAvailableNumbers(number, false, false);
                 }
             }
         }
     }
 
-    private void ToggleNumbersInColumnsOfRow(Vector2Int cubeIndices, Vector2Int startAreaIndices, int number, bool numberState)
+    /// <summary>
+    /// Method for disabling specific number controllers of cube game objects within a specific row of the sudoku board.
+    /// </summary>
+    /// <param name="cubeIndices">Indices of the selected cube game object in the sudoku board.</param>
+    /// <param name="startAreaIndices">Starting indices of the area associated with the selected cube game object.</param>
+    /// <param name="number">The number identifying number controllers of cube game objects to be disabled in a specified row of the sudoku board.</param>
+    private void DisableNumberInRow(Vector2Int cubeIndices, Vector2Int startAreaIndices, int number)
     {
         // Disable number in cubes in all columns of indicated row
         for (int j = 0; j < CubeControllerMatrix.GetLength(1); j++)
@@ -219,31 +228,62 @@ public class BoardController : MonoBehaviour
                 if ((j < startAreaIndices.y) || (j >= startAreaIndices.y + NumberOfCubesPerArea.y))
                 {
                     if (CubeControllerMatrix[cubeIndices.x, j].CubeNumber == 0)
-                    {
-                        CubeControllerMatrix[cubeIndices.x, j].ToggleSpecificNumberControllerState(number, numberState);
-                    }
-                    CubeControllerMatrix[cubeIndices.x, j].UpdateAvailableNumbers(number, numberState, false, false);
+                        CubeControllerMatrix[cubeIndices.x, j].ToggleSpecificNumberControllerState(number, false);
+                    CubeControllerMatrix[cubeIndices.x, j].UpdateAvailableNumbers(number, false, false);
                 }
             }
         }
     }
 
-    private void EnableNumberInAreaOfCube(Vector2Int cubeIndices, Vector2Int startAreaIndices, int number, Dictionary<int, List<BacktrackCubeData>> invalidCubeData)
+    /// <summary>
+    /// Method that is called to revert a specific cube update in the sudoku board.
+    /// </summary>
+    /// <param name="cubeIndices">Indices of the cube that was updated.</param>
+    /// <param name="cubeNumber">Number associated with the cube that was updated.</param>
+    /// <param name="invalidCubeData">A list containing all invalid cube data that was obtained from backtracking.</param>
+    public void RevertCubeUpdate(Vector2Int cubeIndices, int cubeNumber, List<BacktrackCubeData> invalidCubeData)
     {
+        // Calculuate the start area indices associated with the specified cube
+        Vector2Int startAreaIndices = CalculateAreaStartIndicesFromCubeIndices(cubeIndices);
+
+        // Re-enable/Reset the selected cube + adjust available count map
+        CubeControllerMatrix[cubeIndices.x, cubeIndices.y].ResetCubeController();
+        SelectedCubeList.Remove(CubeControllerMatrix[cubeIndices.x, cubeIndices.y]);
+        NumberCountToCubeListMap[CubeControllerMatrix[cubeIndices.x, cubeIndices.y].CountAvailableNumbersForCube()]
+            .Add(CubeControllerMatrix[cubeIndices.x, cubeIndices.y]);
+
+        // Propagate the new cube number selection to surrounding cubes (area, row, column)
+        EnableNumberInArea(cubeIndices, startAreaIndices, cubeNumber, invalidCubeData);
+        EnableNumberInColumn(cubeIndices, startAreaIndices, cubeNumber, invalidCubeData);
+        EnableNumberInRow(cubeIndices, startAreaIndices, cubeNumber, invalidCubeData);
+    }
+
+    /// <summary>
+    /// Method for enabling specific number controllers of cube game objects in a specific area of the sudoku board.
+    /// </summary>
+    /// <param name="cubeIndices">Indices of the re-enabled cube game object in the sudoku board.</param>
+    /// <param name="startAreaIndices">Starting indices of the area associated with the re-enabled cube game object.</param>
+    /// <param name="number">The number identifying number controllers of cube game objects to be enabled in an area in sudoku board.</param>
+    /// <param name="invalidCubeData">List consisting of invalid cube data found from backtracking.</param>
+    private void EnableNumberInArea(Vector2Int cubeIndices, Vector2Int startAreaIndices, int number, List<BacktrackCubeData> invalidCubeData)
+    {
+        // Iterate through all cube controllers within the area
         for (int x = startAreaIndices.x; x < startAreaIndices.x + NumberOfCubesPerArea.x; x++)
         {
             for (int y = startAreaIndices.y; y < startAreaIndices.y + NumberOfCubesPerArea.y; y++)
             {
-                // Ignore the "target" cube itself
+                // Ignore the re-enabled cube game object itself
                 if ((x != cubeIndices.x) || (y != cubeIndices.y))
                 {
-                    if (!IsCubeUpdateInvalid(CubeControllerMatrix[x, y], invalidCubeData))
+                    // Should number remain disabled based on previous backtracking information?
+                    if (!ShouldCubeRemainDisabled(CubeControllerMatrix[x, y], invalidCubeData))
                     {
-                        if ((!DoesNumberExistInColumnOfCube(x, y, startAreaIndices, number)) && (!DoesNumberExistInRowOfCube(x, y, startAreaIndices, number)))
+                        // Only re-enable cube controller if appropriate based on column and row restrictions
+                        if ((!DoesNumberExistInColumn(x, y, startAreaIndices, number)) && (!DoesNumberExistInRow(x, y, startAreaIndices, number)))
                         {
                             if (CubeControllerMatrix[x, y].CubeNumber == 0)
                                 CubeControllerMatrix[x, y].ToggleSpecificNumberControllerState(number, true);
-                            CubeControllerMatrix[x, y].UpdateAvailableNumbers(number, true, false, false);
+                            CubeControllerMatrix[x, y].UpdateAvailableNumbers(number, true, false);
                         }
                     }
                 }
@@ -251,28 +291,36 @@ public class BoardController : MonoBehaviour
         }
     }
 
-    private void EnableNumberInColumnOfCube(Vector2Int cubeIndices, Vector2Int startAreaIndices, int number, Dictionary<int, List<BacktrackCubeData>> invalidCubeData)
+    /// <summary>
+    /// Method for enabling specific number controllers of cube game objects in a specific column of the sudoku board.
+    /// </summary>
+    /// <param name="cubeIndices">Indices of the re-enabled cube game object in the sudoku board.</param>
+    /// <param name="startAreaIndices">Starting indices of the area associated with the re-enabled cube game object.</param>
+    /// <param name="number">The number identifying number controllers of cube game objects to be enabled in the column in sudoku board.</param>
+    /// <param name="invalidCubeData">List consisting of invalid cube data found from backtracking.</param>
+    private void EnableNumberInColumn(Vector2Int cubeIndices, Vector2Int startAreaIndices, int number, List<BacktrackCubeData> invalidCubeData)
     {
-        // Disable number in cubes in all rows of indicated column
+        // Iterate through cube controllers for all rows in the sudoku board
         for (int i = 0; i < CubeControllerMatrix.GetLength(0); i++)
         {
-            // Don't update the selected cube itself - since the number has been disabled in the cube already
+            // Ignore the re-enabled cube game object itself (which has been processed already)
             if (cubeIndices.x != i)
             {
-                // Only disable number in cubes outside of the area (which have been processed already)
+                // Only enable number in cubes outside of the area (which have been processed already)
                 if ((i < startAreaIndices.x) || (i >= startAreaIndices.x + NumberOfCubesPerArea.x))
                 {
-                    if (!IsCubeUpdateInvalid(CubeControllerMatrix[i, cubeIndices.y], invalidCubeData))
+                    // Should number remain disabled based on previous backtracking information?
+                    if (!ShouldCubeRemainDisabled(CubeControllerMatrix[i, cubeIndices.y], invalidCubeData))
                     {
+                        // Only re-enable cube controller if appropriate based on area and row restrictions
                         Vector2Int startAreaIndicesForSelectedCube = CalculateAreaStartIndicesFromCubeIndices(new Vector2Int(i, cubeIndices.y));
-
-                        if ((!DoesNumberExistInAreaOfCube(i, cubeIndices.y, startAreaIndicesForSelectedCube, number)))
+                        if ((!DoesNumberExistInArea(i, cubeIndices.y, startAreaIndicesForSelectedCube, number)))
                         {
-                            if (!DoesNumberExistInRowOfCube(i, cubeIndices.y, startAreaIndicesForSelectedCube, number))
+                            if (!DoesNumberExistInRow(i, cubeIndices.y, startAreaIndicesForSelectedCube, number))
                             {
                                 if (CubeControllerMatrix[i, cubeIndices.y].CubeNumber == 0)
                                     CubeControllerMatrix[i, cubeIndices.y].ToggleSpecificNumberControllerState(number, true);
-                                CubeControllerMatrix[i, cubeIndices.y].UpdateAvailableNumbers(number, true, false, false);
+                                CubeControllerMatrix[i, cubeIndices.y].UpdateAvailableNumbers(number, true, false);
                             }
                         }
                     }
@@ -281,27 +329,36 @@ public class BoardController : MonoBehaviour
         }
     }
 
-    private void EnableNumberInRowOfCube(Vector2Int cubeIndices, Vector2Int startAreaIndices, int number, Dictionary<int, List<BacktrackCubeData>> invalidCubeData)
+    /// <summary>
+    /// Method for enabling specific number controllers of cube game objects in a specific row of the sudoku board.
+    /// </summary>
+    /// <param name="cubeIndices">Indices of the re-enabled cube game object in the sudoku board.</param>
+    /// <param name="startAreaIndices">Starting indices of the area associated with the re-enabled cube game object.</param>
+    /// <param name="number">The number identifying number controllers of cube game objects to be enabled in the row in sudoku board.</param>
+    /// <param name="invalidCubeData">List consisting of invalid cube data found from backtracking.</param>
+    private void EnableNumberInRow(Vector2Int cubeIndices, Vector2Int startAreaIndices, int number, List<BacktrackCubeData> invalidCubeData)
     {
+        // Iterate through cube controllers for all columns of the sudoku board
         for (int j = 0; j < CubeControllerMatrix.GetLength(0); j++)
         {
-            // Ignore the "target" cube itself
+            // Ignore the re-enabled cube game object itself (which has been processed already)
             if (cubeIndices.y != j)
             {
-                // Only consider cubes outside the area
+                // Only enable number in cubes outside of the area (which have been processed already)
                 if ((j < startAreaIndices.y) || (j >= startAreaIndices.y + NumberOfCubesPerArea.y))
                 {
-                    if (!IsCubeUpdateInvalid(CubeControllerMatrix[cubeIndices.x, j], invalidCubeData))
+                    // Should number remain disabled based on previous backtracking information?
+                    if (!ShouldCubeRemainDisabled(CubeControllerMatrix[cubeIndices.x, j], invalidCubeData))
                     {
+                        // Only re-enable cube controller if appropriate based on area and column restrictions
                         Vector2Int startAreaIndicesForSelectedCube = CalculateAreaStartIndicesFromCubeIndices(new Vector2Int(cubeIndices.x, j));
-
-                        if ((!DoesNumberExistInAreaOfCube(cubeIndices.x, j, startAreaIndicesForSelectedCube, number)))
+                        if ((!DoesNumberExistInArea(cubeIndices.x, j, startAreaIndicesForSelectedCube, number)))
                         {
-                            if (!DoesNumberExistInColumnOfCube(cubeIndices.x, j, startAreaIndicesForSelectedCube, number))
+                            if (!DoesNumberExistInColumn(cubeIndices.x, j, startAreaIndicesForSelectedCube, number))
                             {
                                 if (CubeControllerMatrix[cubeIndices.x, j].CubeNumber == 0)
                                     CubeControllerMatrix[cubeIndices.x, j].ToggleSpecificNumberControllerState(number, true);
-                                CubeControllerMatrix[cubeIndices.x, j].UpdateAvailableNumbers(number, true, false, false);
+                                CubeControllerMatrix[cubeIndices.x, j].UpdateAvailableNumbers(number, true, false);
                             }
                         }
                     }
@@ -310,25 +367,39 @@ public class BoardController : MonoBehaviour
         }
     }
 
-    private bool IsCubeUpdateInvalid(CubeController cubeController, Dictionary<int, List<BacktrackCubeData>> invalidCubeData)
+    /// <summary>
+    /// Helper method for checking whether a cube update matches any of the cube data in the provided list of cube data.
+    /// This provided list contains invalid cube information obtained from backtracking.
+    /// </summary>
+    /// <param name="selectedCubeController">Cube controller that is going to have a number selected.</param>
+    /// <param name="invalidCubeData">A list of invalid cube data, which was obtained from backtracking.</param>
+    /// <returns>True if the selected cube update is invalid. False otherwise.</returns>
+    private bool ShouldCubeRemainDisabled(CubeController selectedCubeController, List<BacktrackCubeData> invalidCubeData)
     {
         // Check if the cube number + cube indices match any cube data in the invalid cube data map
-        if (invalidCubeData.ContainsKey(cubeController.CubeNumber))
-            for (int x = 0; x < invalidCubeData[cubeController.CubeNumber].Count; x++)
-                if ((invalidCubeData[cubeController.CubeNumber][x].CubeIndices.x == cubeController.CubeIndices.x)
-                && (invalidCubeData[cubeController.CubeNumber][x].CubeIndices.y == cubeController.CubeIndices.y))
+        foreach (BacktrackCubeData cubeData in invalidCubeData)
+            if (cubeData.CubeNumber == selectedCubeController.CubeNumber)
+                if ((cubeData.CubeIndices.x == selectedCubeController.CubeIndices.x) && (cubeData.CubeIndices.y == selectedCubeController.CubeIndices.y))
                     return true;
-
         return false;
     }
 
-    private bool DoesNumberExistInAreaOfCube(int rowIndex, int colIndex, Vector2Int startAreaIndices, int number)
+    /// <summary>
+    /// Helper method for identifying if a number exists within a specified area of the sudoku board.
+    /// </summary>
+    /// <param name="rowIndex">The row index of the re-enabled cube controller.</param>
+    /// <param name="colIndex">The column index of the re-enabled cube controller.</param>
+    /// <param name="startAreaIndices">The starting indices of the area associated with the re-enabled cube game object.</param>
+    /// <param name="number">The number that is checked within the area of the sudoku board.</param>
+    /// <returns>True if number exists in area. False if otherwise.</returns>
+    private bool DoesNumberExistInArea(int rowIndex, int colIndex, Vector2Int startAreaIndices, int number)
     {
+        // Iterate through all cube controllers of the specified area
         for (int x = startAreaIndices.x; x < startAreaIndices.x + NumberOfCubesPerArea.x; x++)
         {
             for (int y = startAreaIndices.y; y < startAreaIndices.y + NumberOfCubesPerArea.y; y++)
             {
-                // Ignore the "target" cube itself
+                // Ignore the re-enabled cube itself
                 if ((x != rowIndex) || (y != colIndex))
                 {
                     if (CubeControllerMatrix[x, y].CubeNumber == number)
@@ -336,18 +407,26 @@ public class BoardController : MonoBehaviour
                 }
             }
         }
-
         return false;
     }
 
-    private bool DoesNumberExistInColumnOfCube(int rowIndex, int colIndex, Vector2Int startAreaIndices, int number)
+    /// <summary>
+    /// Helper method for identifying if a number exists within a specified column of the sudoku board.
+    /// </summary>
+    /// <param name="rowIndex">The row index of the re-enabled cube controller.</param>
+    /// <param name="colIndex">The column index of the re-enabled cube controller.</param>
+    /// <param name="startAreaIndices">The starting indices of the area associated with the re-enabled cube game object.</param>
+    /// <param name="number">The number that is checked within the rows of the sudoku board.</param>
+    /// <returns>True if number exists in the column. False if otherwise.</returns>
+    private bool DoesNumberExistInColumn(int rowIndex, int colIndex, Vector2Int startAreaIndices, int number)
     {
+        // Iterate through all rows of the sudoku board
         for (int i = 0; i < CubeControllerMatrix.GetLength(0); i++)
         {
-            // Ignore the "target" cube itself
+            // Ignore the re-enabled cube itself
             if (rowIndex != i)
             {
-                // Only consider cubes outside the area
+                // Only consider cubes outside the area (area already checked)
                 if ((i < startAreaIndices.x) || (i >= startAreaIndices.x + NumberOfCubesPerArea.x))
                 {
                     if (CubeControllerMatrix[i, colIndex].CubeNumber == number)
@@ -355,18 +434,26 @@ public class BoardController : MonoBehaviour
                 }
             }
         }
-
         return false;
     }
 
-    private bool DoesNumberExistInRowOfCube(int rowIndex, int colIndex, Vector2Int startAreaIndices, int number)
+    /// <summary>
+    /// Helper method for identifying if a number exists within a specified row of the sudoku board.
+    /// </summary>
+    /// <param name="rowIndex">The row index of the re-enabled cube controller.</param>
+    /// <param name="colIndex">The column index of the re-enabled cube controller.</param>
+    /// <param name="startAreaIndices">The starting indices of the area associated with the re-enabled cube game object.</param>
+    /// <param name="number">The number that is checked within the columns of the sudoku board.</param>
+    /// <returns>True if number exists in the row. False if otherwise.</returns>
+    private bool DoesNumberExistInRow(int rowIndex, int colIndex, Vector2Int startAreaIndices, int number)
     {
+        // Iterate through all columns of the sudoku board
         for (int j = 0; j < CubeControllerMatrix.GetLength(1); j++)
         {
-            // Ignore the "target" cube itself
+            // Ignore the re-enabled cube itself
             if (colIndex != j)
             {
-                // Only consider cubes outside the area
+                // Only consider cubes outside the area (area already checked)
                 if ((j < startAreaIndices.y) || (j >= startAreaIndices.y + NumberOfCubesPerArea.y))
                 {
                     if (CubeControllerMatrix[rowIndex, j].CubeNumber == number)
@@ -374,48 +461,48 @@ public class BoardController : MonoBehaviour
                 }
             }
         }
-
         return false;
     }
 
+    /// <summary>
+    /// Callback for adjusting the available count map when a number is selected for a cube
+    /// controller.
+    /// </summary>
+    /// <param name="cubeIndices">Indices of cube that has been selected.</param>
+    /// <param name="prevCount">Previous count of available numbers for the selected cube controller.</param>
+    /// <param name="newCount">New count of available numbers for the selected cube controller.</param>
     public void UpdateAvailableNumberCountMapSelect(Vector2Int cubeIndices, int prevCount, int newCount)
     {
+        // Remove from count map and add to list of cube controllers that are selected
         NumberCountToCubeListMap[prevCount].Remove(CubeControllerMatrix[cubeIndices.x, cubeIndices.y]);
         SelectedCubeList.Add(CubeControllerMatrix[cubeIndices.x, cubeIndices.y]);
     }
 
-    public void UpdateAvailableNumberCountMapDeselect(Vector2Int cubeIndices, int prevCount, int newCount)
-    {
-        SelectedCubeList.Remove(CubeControllerMatrix[cubeIndices.x, cubeIndices.y]);
-        NumberCountToCubeListMap[CubeControllerMatrix[cubeIndices.x, cubeIndices.y].
-            CountAvailableNumbersForCube()].Add(CubeControllerMatrix[cubeIndices.x, cubeIndices.y]);
-    }
-
+    /// <summary>
+    /// Callback for adjusting the available count map when changes are propagated to cubes from
+    /// enabling/disabling a specific cube controller.
+    /// </summary>
+    /// <param name="cubeIndices">Indices of cube that has been affected by updates propagated from other cube controllers.</param>
+    /// <param name="prevCount">Previous count of available numbers for the affected cube controller.</param>
+    /// <param name="newCount">New count of available numbers for the affected cube controller.</param>
     public void UpdateAvailableNumberCountMapPropagate(Vector2Int cubeIndices, int prevCount, int newCount)
     {
+        // Move the cube controller from the previous list to the new list
         NumberCountToCubeListMap[prevCount].Remove(CubeControllerMatrix[cubeIndices.x, cubeIndices.y]);
         NumberCountToCubeListMap[newCount].Add(CubeControllerMatrix[cubeIndices.x, cubeIndices.y]);
     }
 
+    /// <summary>
+    /// Helper method used during the initialisation of the sudoku board. Places the cube
+    /// controller in the correct list of the available count map.
+    /// </summary>
+    /// <param name="cubeController">The cube controller to be placed in available count map</param>
     private void AddCubeToAvailableCountMap(CubeController cubeController)
     {
-        // If selected, put into selected list
         if (cubeController.CubeNumber != 0)
             SelectedCubeList.Add(cubeController);
         else
             NumberCountToCubeListMap[cubeController.CountAvailableNumbersForCube()].Add(cubeController);
-    }
-
-    private void RevertSelectedCubeChangeInCountMap(int rowIndex, int colIndex)
-    {
-        CubeController cubeController = CubeControllerMatrix[rowIndex, colIndex];
-        SelectedCubeList.Remove(cubeController);
-        NumberCountToCubeListMap[cubeController.CountAvailableNumbersForCube()].Add(cubeController);
-    }
-
-    public void ToggleNumberState(int rowIndex, int colIndex, int number, bool numberState)
-    {
-        CubeControllerMatrix[rowIndex, colIndex].ToggleSpecificNumberControllerState(number, numberState);
     }
 
     /// <summary>
@@ -425,6 +512,7 @@ public class BoardController : MonoBehaviour
     /// <returns>True if board is valid. False if board invalid.</returns>
     public bool IsBoardValid()
     {
+        // If cube controllers exist in this list - cube controllers with no available numbers + no selected number
         if (NumberCountToCubeListMap[0].Count > 0)
             return false;
         return true;
@@ -437,28 +525,19 @@ public class BoardController : MonoBehaviour
     /// <returns>True if board complete. False if board not complete.</returns>
     public bool IsBoardComplete()
     {
-        int counter = 0;
-
-        for (int i = 0; i < CubeControllerMatrix.GetLength(0); i++)
-            for (int j = 0; j < CubeControllerMatrix.GetLength(1); j++)
-                if (CubeControllerMatrix[i, j].CubeNumber != 0)
-                    counter++;
-
-        return counter == (NumberOfAreasInBoard.x * NumberOfCubesPerArea.x * NumberOfAreasInBoard.y * NumberOfCubesPerArea.y);
+        return SelectedCubeList.Count == (NumberOfAreasInBoard.x * NumberOfCubesPerArea.x * NumberOfAreasInBoard.y * NumberOfCubesPerArea.y);
     }
 
+    /// <summary>
+    /// Method for selecting the next cube to be selected.
+    /// </summary>
+    /// <returns>Cube controller of cube game object to be selected.</returns>
     public CubeController SelectLowestEntropyCube()
     {
-        // Ignore 0 since we looking for cubes that do not yet have a number
+        // Iterate through cube controller lists, from lowest to highest available counts - then select random one
         for (int i = 1; i < 10; i++)
-        {
             if (NumberCountToCubeListMap[i].Count > 0)
-            {
-                int randomPosition = Random.Range(0, NumberCountToCubeListMap[i].Count);
-                return NumberCountToCubeListMap[i][randomPosition];
-            }
-        }
-
+                return NumberCountToCubeListMap[i][Random.Range(0, NumberCountToCubeListMap[i].Count)];
         return null;
     }
 }

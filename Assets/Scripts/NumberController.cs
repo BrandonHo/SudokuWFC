@@ -2,11 +2,15 @@
 using UnityEngine.Events;
 using TMPro;
 
+/// <summary>
+/// This class describes the functional logic of a controller for a selectable number 
+/// within a cube controller.
+/// </summary>
 public class NumberController : MonoBehaviour
 {
-    public int Number;
-    public TextMeshProUGUI NumberText;
-    private UnityEventNumberClick OnNumberClickEvent;
+    public int Number;                                  // Number associated with the controller
+    public TextMeshProUGUI NumberText;                  // Text associated with the controller
+    private UnityEventNumberClick OnNumberClickEvent;   // Event that notifies listeners when the number controller is selected
 
     public class UnityEventNumberClick : UnityEvent<int>
     {
