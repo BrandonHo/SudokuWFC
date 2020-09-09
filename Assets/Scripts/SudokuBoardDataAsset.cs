@@ -80,4 +80,10 @@ public class SudokuBoardDataAsset : ScriptableObject
     {
         return GetSudokuCubeData(cubeIndices.x, cubeIndices.y);
     }
+
+    public void ResetBoardAsset()
+    {
+        for (int i = 0; i < SudokuBoardDataRows.Length; i++)
+            SudokuBoardDataRows[i].ResetAllCubeData();
+    }
 }

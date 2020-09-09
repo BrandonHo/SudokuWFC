@@ -23,13 +23,14 @@ public class SudokuCubeData
         return tempList[Random.Range(0, tempList.Count)];
     }
 
-    public SudokuCubeData CopyData()
+    public void Reset()
     {
-        SudokuCubeData newCopy = new SudokuCubeData(CubeIndices.x, CubeIndices.y);
-        newCopy.Number = Number;
+        // Reset the available number array
         for (int i = 0; i < AvailableNumbers.Length; i++)
-            newCopy.AvailableNumbers[i] = AvailableNumbers[i];
+            AvailableNumbers[i] = true;
 
-        return newCopy;
+        // If number not zero, then simply disable the appropriate number in the array
+        if (Number != 0)
+            AvailableNumbers[Number - 1] = false;
     }
 }

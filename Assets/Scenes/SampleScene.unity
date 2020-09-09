@@ -627,9 +627,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ecbb77337a0b72d48881f8f124aee018, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  SudokuBoardData: {fileID: 11400000, guid: 756fdace92c57d34499b6b58528a2e98, type: 2}
+  SudokuBoardData: {fileID: 11400000, guid: 152313aa55e3e5548a470f650f2cb2b7, type: 2}
   SudokuBoardController: {fileID: 1065160366}
-  RandomSeed: 80
+  RandomSeed: 10
   UpdateDelayInSeconds: 0.5
   OffsetBetweenAreas: 0.1
   IsDebugModeOn: 1

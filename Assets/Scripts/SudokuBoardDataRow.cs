@@ -18,4 +18,10 @@ public class SudokuBoardDataRow
         for (int colIndex = 0; colIndex < SudokuCubeDataRow.Length; colIndex++)
             SudokuCubeDataRow[colIndex] = new SudokuCubeData(rowIndex, colIndex);
     }
+
+    public void ResetAllCubeData()
+    {
+        for (int colIndex = 0; colIndex < SudokuCubeDataRow.Length; colIndex++)
+            SudokuCubeDataRow[colIndex].Reset();
+    }
 }

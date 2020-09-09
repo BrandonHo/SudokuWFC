@@ -24,6 +24,7 @@ public class WaveFunctionCollapseManager : MonoBehaviour
         {
             Random.InitState(RandomSeed);
             BacktrackStack = new Stack<BacktrackBoardUpdateData>();
+            SudokuBoardData.ResetBoardAsset();
             SudokuBoardController.CreateSudokuBoard(SudokuBoardData, OffsetBetweenAreas);
             SudokuBoardController.SetupAvailableCountMapsForCubes();
         }
